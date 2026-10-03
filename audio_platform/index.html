@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MusicStore</title>
+<style>
+  :root{--bg:#0d0f14;--s:#161a24;--a:#a78bfa;--t:#e2e4ed;--sub:#8b8fa8;--ok:#4caf7d;--err:#e05c5c}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--t);font-family:system-ui,sans-serif;min-height:100vh}
+  nav{display:flex;align-items:center;gap:1rem;padding:.8rem 2rem;background:var(--s);border-bottom:1px solid #222}
+  nav strong{color:var(--a);font-size:1.1rem;margin-right:auto}
+  nav a{color:var(--sub);text-decoration:none;font-size:.9rem}
+  nav a:hover{color:var(--t)}
+  .btn{background:var(--a);color:#fff;border:none;border-radius:8px;padding:.55rem 1.4rem;
+       font-size:.9rem;cursor:pointer;transition:opacity .15s}
+  .btn:hover{opacity:.85} .btn.ghost{background:transparent;border:1px solid var(--a);color:var(--a)}
+  .page{display:none;padding:2rem;max-width:1100px;margin:0 auto}
+  .page.active{display:block}
+  /* Browse grid */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1.2rem;margin-top:1.5rem}
+  .card{background:var(--s);border-radius:12px;overflow:hidden;cursor:pointer;transition:transform .15s}
+  .card:hover{transform:translateY(-3px)}
+  .card img{width:100%;aspect-ratio:1;object-fit:cover;background:#1a1d27}
+  .card-body{padding:.75rem}
+  .card-title{font-size:.9rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .card-artist{font-size:.78rem;color:var(--sub);margin-top:.2rem}
+  .card-price{font-size:.82rem;color:var(--a);margin-top:.4rem}
+  /* Player bar */
+  #player-bar{position:fixed;bottom:0;left:0;right:0;background:var(--s);border-top:1px solid #222;
+              padding:.75rem 2rem;display:none;align-items:center;gap:1rem}
+  #player-bar audio{flex:1}
+  #player-title{font-size:.85rem;min-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* Forms */
+  .form-card{background:var(--s);border-radius:16px;padding:2rem;max-width:480px;margin:2rem auto}
+  label{display:block;font-size:.82rem;color:var(--sub);margin-bottom:.3rem}
+  input,textarea,select{width:100%;background:var(--bg);color:var(--t);border:1px solid #333;
+                        border-radius:8px;padding:.6rem;font-size:.9rem;margin-bottom:1rem}
+  textarea{resize:vertical;min-height:80px}
+  .err-msg{color:var(--err);font-size:.82rem;margin-bottom:.75rem;min-height:1.1em}
+  .sort-bar{display:flex;gap:.5rem;margin-top:1rem}
+  .sort-bar button{background:var(--s);color:var(--sub);border:1px solid #333;border-radius:6px;
+                   padding:.4rem .9rem;cursor:pointer;font-size:.82rem}
+  .sort-bar button.active{border-color:var(--a);color:var(--a)}
+  /* Upload progress */
+  progress{width:100%;height:6px;accent-color:var(--a);margin-bottom:1rem;display:none}
+</style>
+</head>
+<body>
+
+<nav>
+  <strong>🎵 MusicStore</strong>
+  <a href="#" onclick="showPage('browse')">Browse</a>
+  <a href="#" onclick="showPage('upload')" id="nav-upload" style="display:none">Upload</a>
+  <a href="#" onclick="showPage('dashboard')" id="nav-dash" style="display:none">My Library</a>
+  <span id="nav-credits" style="color:var(--sub);font-size:.82rem;display:none"></span>
+  <button class="btn ghost" id="nav-login-btn" onclick="showPage('login')">Login</button>
+  <button class="btn ghost" id="nav-logout-btn" style="display:none" onclick="logout()">Logout</button>
+</nav>
+
+<!-- Browse -->
+<div class="page active" id="page-browse">
+  <h2 style="margin-bottom:.5rem">Discover Music</h2>
+  <div class="sort-bar">
+    <button class="active" onclick="setSort('new',this)">New</button>
+    <button onclick="setSort('top',this)">Top Played</button>
+    <button onclick="setSort('promoted',this)">Featured</button>
+  </div>
+  <div class="grid" id="browse-grid"></div>
+  <div style="text-align:center;margin-top:1.5rem">
+    <button class="btn ghost" id="load-more-btn" onclick="loadMore()">Load more</button>
+  </div>
+</div>
+
+<!-- Login / Register -->
+<div class="page" id="page-login">
+  <div class="form-card">
+    <h2 id="auth-title" style="margin-bottom:1.2rem">Login</h2>
+    <div class="err-msg" id="auth-err"></div>
+    <label>Email</label>
+    <input type="email" id="auth-email" placeholder="you@example.com">
+    <label>Password</label>
+    <input type="password" id="auth-pass" placeholder="••••••••">
+    <div id="reg-extra" style="display:none">
+      <label>Artist name (optional)</label>
+      <input type="text" id="auth-artist" placeholder="Your artist name">
+    </div>
+    <button class="btn" style="width:100%;margin-bottom:.75rem" onclick="doAuth()">Continue</button>
+    <button class="btn ghost" style="width:100%" onclick="toggleAuthMode()">
+      <span id="auth-toggle-txt">Don't have an account? Register</span>
+    </button>
+  </div>
+</div>
+
+<!-- Upload -->
+<div class="page" id="page-upload">
+  <div class="form-card" style="max-width:560px">
+    <h2 style="margin-bottom:1.2rem">Upload Track</h2><a href="/artist">Dashboard</a>
+    <div class="err-msg" id="upload-err"></div>
+    <label>Audio file (WAV / MP3 / FLAC / OGG — max 500 MB)</label>
+    <input type="file" id="upload-file" accept=".wav,.mp3,.flac,.ogg,.aiff">
+    <label>Title</label>
+    <input type="text" id="upload-title" placeholder="Track title" maxlength="100">
+    <label>Description</label>
+    <textarea id="upload-desc" placeholder="Tell listeners about this track…"></textarea>
+    <label>Price (cents, 0 = free)</label>
+    <input type="number" id="upload-price" value="0" min="0">
+    <progress id="upload-prog"></progress>
+    <button class="btn" style="width:100%" onclick="doUpload()">Upload & Publish</button>
+  </div>
+</div>
+
+<!-- Dashboard / Library -->
+<div class="page" id="page-dashboard">
+  <h2 style="margin-bottom:1.2rem">My Library</h2>
+  <div class="grid" id="library-list"></div>
+</div>
+
+<!-- Player bar -->
+<div id="player-bar">
+  <div id="player-title">—</div>
+  <audio id="audio-el" controls preload="none"></audio>
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────
+const _ME = { id:0, email:1, artist:2, credits:3, is_mod:4, owned:5 };
+const B = { id:0, title:1, artist:2, price:3, plays:4, hw:5, promo:6 };
+let me = null; // { userId, email, artistName, credits, owned[], isMod }
+let browsePage = 0, browseSort = 'new';
+
+// ── Init ──────────────────────────────────────────────────────────────────
+(async () => {
+  await fetchMe();
+  await loadBrowse();
+onl();
+})();
+
+async function fetchMe() {
+  try {
+    const r = await fetch('/m/me');
+    if (!r.ok) return;
+    me = await r.json();
+    document.getElementById('nav-upload').style.display   = 'inline';
+    document.getElementById('nav-dash').style.display     = 'inline';
+    document.getElementById('nav-credits').style.display  = 'inline';
+    document.getElementById('nav-credits').textContent    = `💳 ${(me[_ME.credits]/100).toFixed(2)}`;
+    document.getElementById('nav-login-btn').style.display  = 'none';
+    document.getElementById('nav-logout-btn').style.display = 'inline';
+loadLib();
+  } catch(e) {console.error(e);}
+}
+
+async function fetchInfo(id) {
+  try {
+    const r = await fetch('/m/track?id='+id);
+    if (!r.ok) return;
+    return await r.json();
+  } catch(e) {console.error(e);}
+return null;
+}
+
+async function loadLib() {
+  try {
+let owned = me[_ME.owned];
+let dat=[];
+for(let i=0;i<owned.length;i++){
+const ud = await fetchInfo(owned[i]);
+if(!ud)continue;
+dat.push(ud);
+}
+renderCards2(dat, document.getElementById('library-list'));
+  } catch(e) {console.error(e);}
+}
+
+
+// ── Auth ──────────────────────────────────────────────────────────────────
+let isRegMode = false;
+function toggleAuthMode() {
+  isRegMode = !isRegMode;
+  document.getElementById('auth-title').textContent      = isRegMode ? 'Register' : 'Login';
+  document.getElementById('auth-toggle-txt').textContent = isRegMode
+    ? 'Already have an account? Login' : "Don't have an account? Register";
+  document.getElementById('reg-extra').style.display     = isRegMode ? 'block' : 'none';
+}
+
+async function doAuth() {
+  const email  = document.getElementById('auth-email').value.trim();
+  const pass   = document.getElementById('auth-pass').value;
+  const artist = document.getElementById('auth-artist').value.trim();
+  const errEl  = document.getElementById('auth-err');
+
+  const url  = isRegMode ? '/m/register' : '/m/login';
+  const body = isRegMode
+    ? { email, password: pass, artistName: artist || undefined }
+    : { email, password: pass };
+
+  const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'},
+                                body: JSON.stringify(body) });
+  const j = await r.json();
+  if (!r.ok) { errEl.textContent = j.e || 'Error'; return; }
+  errEl.textContent = '';
+  await fetchMe();
+  showPage('browse');
+}
+
+async function logout() {
+  await fetch('/m/logout', { method:'POST' });
+  me = null;
+  location.reload();
+}
+
+// ── Browse ────────────────────────────────────────────────────────────────
+async function loadBrowse(reset = true) {
+  if (reset) { browsePage = 0; document.getElementById('browse-grid').innerHTML = ''; }
+  const r = await fetch(`/m/browse?page=${browsePage}&sort=${browseSort}`);
+  const j = await r.json(); // [page, sort, [[id,title,...], ...]]
+  const items = j[2];
+  renderCards(items);
+  document.getElementById('load-more-btn').style.display =
+    items.length < 24 ? 'none' : 'inline-block';
+}
+
+function loadMore() { browsePage++; loadBrowse(false); }
+
+function setSort(s, btn) {
+  browseSort = s;
+  document.querySelectorAll('.sort-bar button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  loadBrowse();
+}
+
+function renderCards(items) {
+  const grid = document.getElementById('browse-grid');
+  for (const t of items) {
+    const div = document.createElement('div');
+    div.className = 'card';
+    div.innerHTML = `
+      <img src="/m/icon?id=${t[B.id]}" loading="lazy" alt="">
+      <div class="card-body">
+        <div class="card-title">${esc(t[B.title])}</div>
+        <div class="card-artist">${esc(t[B.artist] || 'Unknown')}</div>
+        <div class="card-price">
+          ${t[B.price] === 0 ? 'Free' : '$'+(t[B.price]/100).toFixed(2)}
+          ${t[B.hw]  ? ' · WAV' : ''}
+          ${t[B.promo] ? ' ⭐' : ''}
+        </div>
+      </div>`;
+    div.onclick = () => openTrackPage(t[0]);
+    grid.appendChild(div);
+  }
+}
+
+function renderCards2(items,grid) {
+  for (let i=0;i<items.length;i++) {
+const item=items[i];
+    const div = document.createElement('div');
+    div.className = 'card';
+    div.innerHTML = `
+      <img src="/m/icon?id=${item[0]}" loading="lazy" alt="">
+      <div class="card-body">
+        <div class="card-title">${esc(item[1])}</div>
+        <div class="card-artist">${esc(item[7] || 'Unknown')}</div>
+        <div class="card-price">${item[3] === 0 ? 'Free' : '$'+(item[3]/100).toFixed(2)}
+          ${item[5] ? ' · WAV' : ''}</div>
+      </div>`;
+    div.onclick = () => openTrack(item);
+    grid.appendChild(div);
+  }
+}
+
+// ── Player ────────────────────────────────────────────────────────────────
+function openTrackPage(id){return window.open("/track?id="+id);}
+async function openTrack(item) {
+/*
+  const owned = me?.owned?.includes(item.id) || item.price === 0;
+  if (!owned && me) {
+    if (!confirm(`Purchase "${item.title}" for $${(item.price/100).toFixed(2)}?`)) return;
+    const r = await fetch('/m/purchase', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ audioId: item.id })
+    });
+    if (!r.ok) { const j=await r.json(); alert(j.e); return; }
+    if (me) { me[_ME.owned].push(item.id); me[_ME.credits] -= item.price; updateCreditsDisplay(); }
+  } else if (!owned) {
+    showPage('login'); return;
+  }
+*/
+  const bar = document.getElementById('player-bar');
+  const el  = document.getElementById('audio-el');
+  document.getElementById('player-title').textContent = `${item[1]} — ${item[7]||'Unknown'}`;
+  el.src = `/m/stream/${item[0]}`;
+  bar.style.display = 'flex';
+  el.play();
+}
+
+function updateCreditsDisplay() {
+  if (me) document.getElementById('nav-credits').textContent = `💳 ${(me[_ME.credits]/100).toFixed(2)}`;
+}
+
+// ── Upload ────────────────────────────────────────────────────────────────
+function doUpload() {
+  const file  = document.getElementById('upload-file').files[0];
+  const title = document.getElementById('upload-title').value.trim();
+  const desc  = document.getElementById('upload-desc').value.trim();
+  const price = parseInt(document.getElementById('upload-price').value) || 0;
+  const errEl = document.getElementById('upload-err');
+  const prog  = document.getElementById('upload-prog');
+
+  if (!file || !title) { errEl.textContent = 'File and title required'; return; }
+
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('title', title);
+  fd.append('description', desc);
+  fd.append('price', price);
+
+  const xhr = new XMLHttpRequest();
+  xhr.upload.onprogress = e => {
+    if (!e.lengthComputable) return;
+    prog.style.display = 'block';
+    prog.value = (e.loaded / e.total) * 100;
+  };
+  xhr.onload = async () => {
+    prog.style.display = 'none';
+    if (xhr.status !== 200) { errEl.textContent = JSON.parse(xhr.responseText).e || 'Upload failed'; return; }
+    const j = JSON.parse(xhr.responseText);
+    errEl.textContent = '';
+    alert(`Track uploaded! ID: ${j.audioId} — processing in background.`);
+    showPage('browse');
+  };
+  xhr.onerror = () => { errEl.textContent = 'Network error'; };
+  xhr.open('POST', '/m/upload');
+  xhr.send(fd);
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + name)?.classList.add('active');
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                  .replace(/"/g,'&quot;');
+}
+
+function onl(){
+const param=new URLSearchParams(location.search);
+const pay = param.get('pay');
+const payId = param.get('id');
+const payProvider = param.get('provider');
+
+if (pay === 'success') {
+  showToast('✅ Payment successful! Credits added.');
+  fetchMe(); // refresh credit display
+} else if (pay === 'pending' && payId) {
+  showToast('⏳ Crypto payment detected — waiting for confirmation…');
+  pollPaymentStatus(payId, payProvider);
+} else if (pay === 'failed') {
+  showToast('❌ Payment failed or cancelled.');
+}
+}
+
+async function pollPaymentStatus(chargeId, provider) {
+  // Poll the return endpoint again — it'll re-check Coinbase
+  const check = async () => {
+    const r = await fetch(`/m/pay/${provider}/return?id=${chargeId}`, {
+      redirect: 'manual' // don't follow the redirect, check where it goes
+    });
+  };
+await fetch(`/m/pay/${provider}/status?id=${chargeId}`);
+}
+</script>
+</body>
+</html>
