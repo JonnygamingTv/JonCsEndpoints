@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta property="og:title" content="Website Stress Test Online"/>
+<meta property="og:type" content="website"/>
+<meta property="og:site_name" content="JonBench"/>
+<meta property="og:url" content="https://bench.jonhosting.com"/>
+<meta property="og:description" content="Free online website benchmark. Stress-test your website for free, no signup needed. See the throughput and latency of your websites."/>
+<meta name="description" content="Free online website benchmark. Stress-test your website for free, no signup needed. See the throughput and latency of your websites."/>
+<title>jonbench — HTTP Load Tester</title>
+<link rel="canonical" href="https://bench.jonhosting.com">
+<style>
+  :root {
+    --bg:     #080b0f;
+    --panel:  #0d1117;
+    --border: #1c2333;
+    --accent: #00e5ff;
+    --red:    #ff3c6e;
+    --dim:    #72859b;
+    --text:   #c9d5e0;
+    --green:  #7ec8a0;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Courier New', Courier, monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 48px 16px 80px;
+    background-image: repeating-linear-gradient(
+      0deg, transparent, transparent 2px,
+      rgba(0,229,255,0.012) 2px, rgba(0,229,255,0.012) 4px
+    );
+  }
+
+  /* ── header ── */
+  header {
+    width: 100%;
+    max-width: 780px;
+    margin-bottom: 40px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 20px;
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+  }
+  header h1 {
+    font-family: system-ui, sans-serif;
+    font-weight: 800;
+    font-size: clamp(1.8rem, 5vw, 2.8rem);
+    letter-spacing: -0.02em;
+    color: #fff;
+  }
+  header h1 span { color: var(--accent); }
+  header p {
+    font-size: 0.78rem;
+    color: var(--dim);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* ── card ── */
+  .card {
+    width: 100%;
+    max-width: 780px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 28px 28px 24px;
+    margin-bottom: 20px;
+  }
+
+  /* ── url row ── */
+  .url-row { display: flex; gap: 10px; margin-bottom: 20px; }
+  .url-row input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--accent);
+    font-family: inherit;
+    font-size: 0.92rem;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .url-row input::placeholder { color: var(--dim); }
+  .url-row input:focus { border-color: var(--accent); }
+
+  /* ── sliders ── */
+  .sliders {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 22px;
+  }
+  @media (max-width: 560px) { .sliders { grid-template-columns: 1fr; } }
+
+  .slider-group label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--dim);
+    margin-bottom: 8px;
+  }
+  .slider-group label span { color: var(--accent); font-size: 0.82rem; }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 100%; height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 13px; height: 13px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+    cursor: pointer;
+    transition: transform 0.1s;
+  }
+  input[type=range]:active::-webkit-slider-thumb { transform: scale(1.3); }
+
+  /* ── run button ── */
+  .run-btn {
+    width: 100%;
+    padding: 13px;
+    background: transparent;
+    border: 1px solid var(--accent);
+    border-radius: 3px;
+    color: var(--accent);
+    font-family: inherit;
+    font-size: 0.9rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: color 0.2s;
+  }
+  .run-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--accent);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.2s ease;
+    z-index: 0;
+  }
+  .run-btn:not(:disabled):hover::before { transform: scaleX(1); }
+  .run-btn:not(:disabled):hover { color: var(--bg); }
+  .run-btn span { position: relative; z-index: 1; }
+  .run-btn:disabled { border-color: var(--dim); color: var(--dim); cursor: not-allowed; }
+
+  /* ── verify note ── */
+  .verify-note { font-size: 0.72rem; color: var(--dim); margin-top: 10px; line-height: 1.6; }
+  .verify-note code {
+    color: var(--red);
+    background: rgba(255,60,110,0.08);
+    padding: 1px 5px;
+    border-radius: 2px;
+  }
+
+  /* ── progress bar ── */
+  #progress-wrap {
+    height: 2px;
+    background: var(--border);
+    width: 100%;
+    max-width: 780px;
+    margin-bottom: 20px;
+    border-radius: 1px;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  #progress-wrap.active { opacity: 1; }
+  #progress-bar {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    box-shadow: 0 0 8px var(--accent);
+  }
+
+  /* ── terminal ── */
+  .terminal-wrap { width: 100%; max-width: 780px; }
+  .term-bar {
+    background: var(--border);
+    border-radius: 3px 3px 0 0;
+    padding: 7px 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.7rem;
+    color: var(--dim);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .dot.r { background: #ff5f57; }
+  .dot.y { background: #febc2e; }
+  .dot.g { background: #28c840; }
+  .term-bar .lbl { margin-left: auto; }
+
+  #output {
+    background: #040608;
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 3px 3px;
+    padding: 18px 20px;
+    min-height: 200px;
+    max-height: 480px;
+    overflow-y: auto;
+    font-size: 0.82rem;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    word-break: break-all;
+    color: #6a8a9a;
+  }
+  #output .cmd  { color: var(--accent); }
+  #output .stat { color: var(--green); }
+  #output .err  { color: var(--red); }
+  #output .done { color: var(--dim); font-style: italic; }
+  #output .cur {
+    display: inline-block;
+    width: 7px; height: 0.9em;
+    background: var(--accent);
+    vertical-align: text-bottom;
+    margin-left: 2px;
+    animation: blink 1s step-end infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  #status {
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border-radius: 2px;
+    margin-left: 8px;
+  }
+  #status.idle    { color: var(--dim); }
+  #status.running { color: var(--accent); background: rgba(0,229,255,0.08); }
+  #status.done    { color: var(--green); background: rgba(126,200,160,0.08); }
+  #status.error   { color: var(--red);   background: rgba(255,60,110,0.08); }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>jon<span>bench</span></h1>
+  <p>HTTP load tester · wrk</p>
+</header>
+
+<div class="card">
+  <div class="url-row">
+    <input type="text" id="urlInput" placeholder="https://example.com/path"
+           autocomplete="off" spellcheck="false">
+  </div>
+  <div class="sliders">
+    <div class="slider-group">
+      <label>Duration <span id="dVal">10s</span></label>
+      <input type="range" id="dur" min="1" max="60" value="10">
+    </div>
+    <div class="slider-group">
+      <label>Threads <span id="tVal">4</span></label>
+      <input type="range" id="thr" min="2" max="8" value="4">
+    </div>
+    <div class="slider-group">
+      <label>Connections <span id="cVal">1050</span></label>
+      <input type="range" id="conn" min="10" max="1100" value="1050" step="10">
+    </div>
+  </div>
+  <button class="run-btn" id="runBtn"><span>▶ Run Benchmark from Sweden</span></button>
+  <p class="verify-note">
+    Prove website ownership by deploying <code>/jonhostbench.txt</code> with the content: <code>1</code> on the target origin (HTTP 200).
+    Only benchmark servers you own or have explicit permission for.
+  </p>
+</div>
+
+<div id="progress-wrap"><div id="progress-bar"></div></div>
+
+<div class="terminal-wrap">
+  <div class="term-bar">
+    <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+    <span class="lbl">wrk output</span>
+    <span id="status" class="idle">idle</span>
+  </div>
+  <div id="output"><span class="cur"></span></div>
+</div>
+<div class="row"><div>Scan SSL/TLS: <a href="https://www.ssllabs.com/ssltest/">SSL Labs</a></div><div>Performant webserver: <a href="//github.com/alvin677/JonCsWebServer/releases">JonCsWebServer</a></div><label><sup>Ads use cookies.</sup></label><iframe loading="lazy" data-aa="2273872" src="//ad.a-ads.com/2273872?size=120x60&background_color=000000" style="border:0;padding:0;overflow:hidden;background-color:transparent;width:120px;height:60px"></iframe></div>
+<script>
+(function () {
+  'use strict';
+
+  // ── Elements (cached once) ────────────────────────────────────────────────
+  const urlInput  = document.getElementById('urlInput');
+  const runBtn    = document.getElementById('runBtn');
+  const btnLabel  = runBtn.querySelector('span');
+  const statusEl  = document.getElementById('status');
+  const out       = document.getElementById('output');
+  const progWrap  = document.getElementById('progress-wrap');
+  const progBar   = document.getElementById('progress-bar');
+  const dur       = document.getElementById('dur');
+  const thr       = document.getElementById('thr');
+  const conn      = document.getElementById('conn');
+
+  // ── Slider labels ─────────────────────────────────────────────────────────
+  dur .addEventListener('input', () => document.getElementById('dVal').textContent = dur.value + 's');
+  thr .addEventListener('input', () => document.getElementById('tVal').textContent = thr.value);
+  conn.addEventListener('input', () => document.getElementById('cVal').textContent = conn.value);
+
+  // ── State ─────────────────────────────────────────────────────────────────
+  let running = false;
+  let evtSrc  = null;
+
+  // ── Run ───────────────────────────────────────────────────────────────────
+  async function startBench() {
+    if (running) return;
+
+    const rawUrl = urlInput.value.trim();
+    if (!rawUrl) { showError('Enter a URL first.'); return; }
+
+    let parsed;
+    try { parsed = new URL(rawUrl); } catch { showError('Invalid URL.'); return; }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      showError('Only http:// and https:// allowed.');
+      return;
+    }
+
+    const d = dur.value, t = thr.value, c = conn.value;
+    const endpoint = `/bench?url=${encodeURIComponent(rawUrl)}&d=${d}&t=${t}&c=${c}`;
+
+    setRunning(true);
+    resetOutput();
+    startProgress(parseInt(d, 10));
+
+    // ── Phase 1: HEAD-like fetch to catch non-200 errors with their body ──
+    // EventSource gives us no access to status code or response body on error,
+    // so we probe with fetch first. We read only the status; on non-200 we read
+    // the text and display it, then bail. On 200 we let EventSource handle it.
+    let probe;
+    try {
+      probe = await fetch(endpoint, { method: 'GET', headers: { Accept: 'text/event-stream' } });
+    } catch (e) {
+      stopProgress(false);
+      showError('Network error: ' + e.message);
+      setRunning(false);
+      return;
+    }
+
+    if (!probe.ok) {
+      // Read the error body the server sent (e.g. "Verification failed: ...", "A benchmark is already running.")
+      let body = '';
+      try { body = await probe.text(); } catch { body = `HTTP ${probe.status}`; }
+      stopProgress(false);
+      showError(body || `HTTP ${probe.status}`);
+      setRunning(false);
+      return;
+    }
+vadp({});
+    // ── Phase 2: now open EventSource — server is already streaming ───────
+    // The fetch above consumed the connection, so we open a fresh EventSource.
+    // The server will re-run the full request (cheap: params are already validated
+    // and the semaphore will be held so a second bench won't start — the second
+    // request hits the semaphore guard and returns 423 unless the first finishes
+    // first, which is fine). To avoid the double-request, we instead consume the
+    // fetch stream directly below.
+    // 
+    // ── Actually: consume the SSE stream from the fetch response directly ──
+    // This avoids the double request entirely and still gives us error bodies.
+    probe.body
+      .pipeThrough(new TextDecoderStream())
+      .pipeThrough(sseTransform())
+      .pipeTo(new WritableStream({
+        write(line) { handleLine(line); },
+        close()     { onStreamClose(true); },
+        abort(e)    { onStreamClose(false, String(e)); },
+      }))
+      .catch(e => onStreamClose(false, e?.message));
+  }
+
+  // ── SSE TransformStream ───────────────────────────────────────────────────
+  // Parses the raw "data: ...\n\n" SSE wire format into plain payload strings.
+  function sseTransform() {
+    let buf = '';
+    return new TransformStream({
+      transform(chunk, ctrl) {
+        buf += chunk;
+        let idx;
+        // SSE events are terminated by \n\n
+        while ((idx = buf.indexOf('\n\n')) !== -1) {
+          const block = buf.slice(0, idx);
+          buf = buf.slice(idx + 2);
+          for (const line of block.split('\n')) {
+            if (line.startsWith('data: ')) ctrl.enqueue(line.slice(6));
+          }
+        }
+      },
+      flush(ctrl) {
+        // Drain any trailing partial event
+        if (buf.startsWith('data: ')) ctrl.enqueue(buf.slice(6));
+      }
+    });
+  }
+
+  // ── Line handler ──────────────────────────────────────────────────────────
+  function handleLine(data) {
+    if (data === '[done]') {
+      appendLine('── finished ──', 'done');
+      removeCursor();
+      setRunning(false);
+      setStatus('done', 'done');
+      stopProgress(true);
+      return;
+    }
+    appendLine(data, classify(data));
+  }
+
+  function onStreamClose(clean, msg) {
+    removeCursor();
+    if (running) { // only if [done] sentinel wasn't already received
+      if (clean) {
+        appendLine('── stream closed ──', 'done');
+        setStatus('done', 'done');
+        stopProgress(true);
+      } else {
+        appendLine('✗ ' + (msg || 'stream error'), 'err');
+        setStatus('error', 'error');
+        stopProgress(false);
+      }
+      setRunning(false);
+    }
+  }
+
+  function classify(line) {
+    if (line.startsWith('[bench]')) return 'cmd';
+    if (line.startsWith('[error]')) return 'err';
+    if (/Requests\/sec|Transfer\/sec|Latency|Avg\s|Stdev|99%|errors/.test(line)) return 'stat';
+    return '';
+  }
+
+  // ── Output helpers ────────────────────────────────────────────────────────
+  function resetOutput() {
+    out.innerHTML = '<span class="cur"></span>';
+  }
+
+  function appendLine(text, cls) {
+    const cursor = out.querySelector('.cur');
+    const div = document.createElement('div');
+    if (cls) div.className = cls;
+    div.textContent = text;
+    out.insertBefore(div, cursor);
+    out.scrollTop = out.scrollHeight;
+  }
+
+  function removeCursor() {
+    out.querySelector('.cur')?.remove();
+  }
+
+  function showError(msg) {
+    resetOutput();
+    removeCursor();
+    appendLine('✗ ' + msg, 'err');
+    setStatus('error', 'error');
+  }
+
+  // ── Status / button ───────────────────────────────────────────────────────
+  function setStatus(text, cls) {
+    statusEl.textContent = text;
+    statusEl.className   = cls;
+  }
+
+  function setRunning(state) {
+    running      = state;
+    runBtn.disabled = state;
+    btnLabel.textContent = state ? '◼ Running…' : '▶ Run Benchmark from Sweden';
+    if (state) setStatus('running', 'running');
+  }
+
+  // ── Progress bar ──────────────────────────────────────────────────────────
+  function startProgress(seconds) {
+    progBar.style.transition = 'none';
+    progBar.style.width = '0%';
+    progWrap.classList.add('active');
+    void progBar.offsetWidth; // force reflow before re-enabling transition
+    progBar.style.transition = `width ${seconds}s linear`;
+    progBar.style.width = '95%';
+  }
+
+  function stopProgress(success) {
+    progBar.style.transition = 'width 0.3s ease';
+    progBar.style.width = success ? '100%' : '0%';
+    setTimeout(() => {
+      progWrap.classList.remove('active');
+      progBar.style.width = '0%';
+    }, 900);
+  }
+
+  // ── Wire up ───────────────────────────────────────────────────────────────
+  runBtn.addEventListener('click', startBench);
+  urlInput.addEventListener('keydown', e => { if (e.key === 'Enter') startBench(); });
+})();
+function vadp(x){
+if(vadp.L)return;
+vadp.L=true;
+var d=document,
+g=d.head.appendChild(d.createElement('script'));g.async=true;g.crossorigin="anonymous";
+g.src='https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7904260775348405';
+}
+</script>
+</body>
+</html>

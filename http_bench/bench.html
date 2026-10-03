@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta property="og:title" content="Website Speed Test | Online"/><meta property="og:type" content="website"/><meta property="og:site_name" content="JonBench"/>
+<meta property="og:description" content="Free online website benchmark. Stresstest your website for free, no signup needed."/>
+<title>jonbench — HTTP Load Tester</title>
+<style>
+  :root {
+    --bg:       #080b0f;
+    --panel:    #0d1117;
+    --border:   #1c2333;
+    --accent:   #00e5ff;
+    --accent2:  #ff3c6e;
+    --dim:      #3a4a5c;
+    --text:     #c9d5e0;
+    --mono:     'Share Tech Mono', monospace;
+    --sans:     'Syne', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 48px 16px 80px;
+    /* subtle scanline overlay */
+    background-image: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,229,255,0.015) 2px,
+      rgba(0,229,255,0.015) 4px
+    );
+  }
+
+  /* ── header ── */
+  header {
+    width: 100%;
+    max-width: 780px;
+    margin-bottom: 40px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 20px;
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+  }
+  header h1 {
+    font-family: var(--sans);
+    font-weight: 800;
+    font-size: clamp(1.8rem, 5vw, 2.8rem);
+    letter-spacing: -0.02em;
+    color: #fff;
+  }
+  header h1 span { color: var(--accent); }
+  header p {
+    font-size: 0.78rem;
+    color: var(--dim);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* ── card ── */
+  .card {
+    width: 100%;
+    max-width: 780px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 28px 28px 24px;
+    margin-bottom: 20px;
+  }
+
+  /* ── url row ── */
+  .url-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .url-row input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 0.92rem;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .url-row input::placeholder { color: var(--dim); }
+  .url-row input:focus { border-color: var(--accent); }
+
+  /* ── sliders ── */
+  .sliders {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 22px;
+  }
+  @media (max-width: 560px) { .sliders { grid-template-columns: 1fr; } }
+
+  .slider-group label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--dim);
+    margin-bottom: 8px;
+  }
+  .slider-group label span {
+    color: var(--accent);
+    font-size: 0.82rem;
+  }
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+    cursor: pointer;
+    transition: transform 0.1s;
+  }
+  input[type=range]:active::-webkit-slider-thumb { transform: scale(1.3); }
+
+  /* ── run button ── */
+  .run-btn {
+    width: 100%;
+    padding: 13px;
+    background: transparent;
+    border: 1px solid var(--accent);
+    border-radius: 3px;
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 0.9rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: color 0.2s, background 0.2s;
+  }
+  .run-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--accent);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.2s ease;
+    z-index: 0;
+  }
+  .run-btn:hover::before { transform: scaleX(1); }
+  .run-btn:hover { color: var(--bg); }
+  .run-btn span { position: relative; z-index: 1; }
+  .run-btn:disabled {
+    border-color: var(--dim);
+    color: var(--dim);
+    cursor: not-allowed;
+  }
+  .run-btn:disabled::before { display: none; }
+
+  /* ── verify note ── */
+  .verify-note {
+    font-size: 0.72rem;
+    color: var(--dim);
+    margin-top: 10px;
+    line-height: 1.6;
+  }
+  .verify-note code {
+    color: var(--accent2);
+    background: rgba(255,60,110,0.08);
+    padding: 1px 5px;
+    border-radius: 2px;
+  }
+
+  /* ── terminal ── */
+  .terminal-wrap {
+    width: 100%;
+    max-width: 780px;
+  }
+  .term-bar {
+    background: var(--border);
+    border-radius: 3px 3px 0 0;
+    padding: 7px 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.7rem;
+    color: var(--dim);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .term-bar .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); }
+  .term-bar .dot.red   { background: #ff5f57; }
+  .term-bar .dot.yel   { background: #febc2e; }
+  .term-bar .dot.grn   { background: #28c840; }
+  .term-bar .label { margin-left: auto; }
+
+  #output {
+    background: #040608;
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 3px 3px;
+    padding: 18px 20px;
+    min-height: 200px;
+    max-height: 480px;
+    overflow-y: auto;
+    font-size: 0.82rem;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    word-break: break-all;
+    color: #6a8a9a;
+  }
+  #output .line-cmd  { color: var(--accent); }
+  #output .line-stat { color: #7ec8a0; }
+  #output .line-err  { color: var(--accent2); }
+  #output .line-done { color: var(--dim); font-style: italic; }
+  #output .cursor {
+    display: inline-block;
+    width: 7px;
+    height: 0.9em;
+    background: var(--accent);
+    vertical-align: text-bottom;
+    margin-left: 2px;
+    animation: blink 1s step-end infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ── status badge ── */
+  #status {
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border-radius: 2px;
+    margin-left: 8px;
+  }
+  #status.idle    { color: var(--dim);    background: transparent; }
+  #status.running { color: var(--accent); background: rgba(0,229,255,0.08); }
+  #status.done    { color: #7ec8a0;       background: rgba(126,200,160,0.08); }
+  #status.error   { color: var(--accent2);background: rgba(255,60,110,0.08); }
+
+  /* ── progress bar ── */
+  #progress-wrap {
+    height: 2px;
+    background: var(--border);
+    width: 100%;
+    max-width: 780px;
+    margin-bottom: 20px;
+    border-radius: 1px;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  #progress-wrap.active { opacity: 1; }
+  #progress-bar {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    box-shadow: 0 0 8px var(--accent);
+    transition: width 0.5s linear;
+  }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>jon<span>bench</span></h1>
+  <p>HTTP load tester · wrk</p>
+</header>
+
+<div class="card">
+  <div class="url-row">
+    <input type="text" id="urlInput" placeholder="https://example.com/path" autocomplete="off" spellcheck="false">
+  </div>
+
+  <div class="sliders">
+    <div class="slider-group">
+      <label>Duration <span id="dVal">10s</span></label>
+      <input type="range" id="dur" min="1" max="60" value="10" step="1">
+    </div>
+    <div class="slider-group">
+      <label>Threads <span id="tVal">6</span></label>
+      <input type="range" id="thr" min="2" max="8" value="6" step="1">
+    </div>
+    <div class="slider-group">
+      <label>Connections <span id="cVal">1050</span></label>
+      <input type="range" id="conn" min="10" max="1100" value="1050" step="10">
+    </div>
+  </div>
+
+  <button class="run-btn" id="runBtn" onclick="startBench()"><span>▶ Run Benchmark from Sweden</span></button>
+
+  <p class="verify-note">
+    Prove website ownership by deploying <code>/jonhostbench.txt</code> on the target origin (HTTP 200).
+    Only benchmark servers you own or have explicit permission for.
+  </p>
+</div>
+
+<div id="progress-wrap"><div id="progress-bar"></div></div>
+
+<div class="terminal-wrap">
+  <div class="term-bar">
+    <div class="dot red"></div><div class="dot yel"></div><div class="dot grn"></div>
+    <span class="label">wrk output</span>
+    <span id="status" class="idle">idle</span>
+  </div>
+  <div id="output"><span class="cursor"></span></div>
+</div>
+<div class="row"><label><sup>Ads use cookies.</sup></label><iframe loading="lazy" data-aa="2273872" src="//ad.a-ads.com/2273872?size=120x60&background_color=000000" style="border:0;padding:0;overflow:hidden;background-color:transparent;width:120px;height:60px"></iframe></div>
+<script>
+  // ── Slider display ──────────────────────────────────────────────────────────
+  const dur  = document.getElementById('dur');
+  const thr  = document.getElementById('thr');
+  const conn = document.getElementById('conn');
+
+  dur .addEventListener('input', () => document.getElementById('dVal').textContent = dur.value  + 's');
+  thr .addEventListener('input', () => document.getElementById('tVal').textContent = thr.value);
+  conn.addEventListener('input', () => document.getElementById('cVal').textContent = conn.value);
+
+  // ── State ────────────────────────────────────────────────────────────────────
+  let running  = false;
+  let evtSrc   = null;
+  let progTimer = null;
+
+  // ── Benchmark ─────────────────────────────────────────────────────────────────
+  function startBench() {
+    if (running) return;
+
+    const rawUrl = document.getElementById('urlInput').value.trim();
+    if (!rawUrl) { flashError('Enter a URL first.'); return; }
+
+    // Basic client-side URL sanity (server re-validates properly)
+    let parsed;
+    try { parsed = new URL(rawUrl); } catch { flashError('Invalid URL.'); return; }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      flashError('Only http:// and https:// allowed.');
+      return;
+    }
+
+    const d = dur.value;
+    const t = thr.value;
+    const c = conn.value;
+
+    const endpoint = `/bench?url=${encodeURIComponent(rawUrl)}&d=${d}&t=${t}&c=${c}`;
+
+    setRunning(true);
+    clearOutput();
+
+    // progress bar
+    startProgress(parseInt(d));
+
+    evtSrc = new EventSource(endpoint);
+
+    evtSrc.onmessage = (e) => {
+      const data = e.data;
+      if (data === '[done]') {
+        appendLine('── finished ──', 'line-done');
+        removeCursor();
+        setRunning(false);
+        setStatus('done', 'done');
+        stopProgress(true);
+        evtSrc.close();
+        return;
+      }
+      const cls = classifyLine(data);
+      appendLine(data, cls);
+    };
+
+    evtSrc.onerror = (e) => {
+      appendLine('[connection closed]', 'line-err');
+      removeCursor();
+      setRunning(false);
+      setStatus('error', 'error');
+      stopProgress(false);
+      evtSrc.close();
+    };
+evtSrc.onresult=console.log;
+  }
+
+  function classifyLine(line) {
+    if (line.startsWith('[bench]'))  return 'line-cmd';
+    if (line.startsWith('[error]'))  return 'line-err';
+    if (/Requests\/sec|Transfer\/sec|Latency|Avg\s|Stdev|99%|errors/.test(line)) return 'line-stat';
+    return '';
+  }
+
+  // ── Output helpers ─────────────────────────────────────────────────────────
+  const out = document.getElementById('output');
+
+  function clearOutput() {
+    out.innerHTML = '<span class="cursor"></span>';
+  }
+
+  function appendLine(text, cls) {
+    // Insert before cursor
+    const cursor = out.querySelector('.cursor');
+    const div = document.createElement('div');
+    if (cls) div.className = cls;
+    div.textContent = text;
+    out.insertBefore(div, cursor);
+    out.scrollTop = out.scrollHeight;
+  }
+
+  function removeCursor() {
+    const c = out.querySelector('.cursor');
+    if (c) c.remove();
+  }
+
+  function flashError(msg) {
+    clearOutput();
+    removeCursor();
+    appendLine('✗ ' + msg, 'line-err');
+    setStatus('error', 'error');
+  }
+
+  // ── Status ─────────────────────────────────────────────────────────────────
+  const statusEl = document.getElementById('status');
+
+  function setStatus(text, cls) {
+    statusEl.textContent = text;
+    statusEl.className   = cls;
+  }
+
+  function setRunning(state) {
+    running = state;
+    const btn = document.getElementById('runBtn');
+    btn.disabled = state;
+    btn.querySelector('span').textContent = state ? '◼ Running…' : '▶ Run Benchmark';
+    if (state) setStatus('running', 'running');
+  }
+
+  // ── Progress bar ────────────────────────────────────────────────────────────
+  const progWrap = document.getElementById('progress-wrap');
+  const progBar  = document.getElementById('progress-bar');
+
+  function startProgress(seconds) {
+    progWrap.classList.add('active');
+    progBar.style.transition = 'none';
+    progBar.style.width = '0%';
+    // force reflow
+    void progBar.offsetWidth;
+    progBar.style.transition = `width ${seconds}s linear`;
+    progBar.style.width = '95%'; // stop at 95% — done event finishes it
+  }
+
+  function stopProgress(success) {
+    progBar.style.transition = 'width 0.3s ease';
+    progBar.style.width = success ? '100%' : '0%';
+    setTimeout(() => { progWrap.classList.remove('active'); progBar.style.width = '0%'; }, 900);
+  }
+
+  // ── Enter key ───────────────────────────────────────────────────────────────
+  document.getElementById('urlInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') startBench();
+  });
+</script>
+</body>
+</html>
