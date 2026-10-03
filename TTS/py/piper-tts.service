@@ -1,0 +1,31 @@
+[Unit]
+Description=Piper TTS Sidecar (Unix socket)
+After=network.target
+# Ensures socket dir exists — see .socket unit below (optional)
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+
+# Adjust to wherever your venv lives
+ExecStart=/opt/piper-venv/bin/python /opt/piper-sidecar/server.py
+
+Environment=VOICES_DIR=/opt/piper-voices
+Environment=SOCKET_PATH=/run/piper-tts/piper.sock
+Environment=MAX_SYNTH_THREADS=6
+
+RuntimeDirectory=piper-tts
+RuntimeDirectoryMode=0755
+
+# Let existing requests drain before kill
+TimeoutStopSec=10
+Restart=on-failure
+RestartSec=3
+
+# onnxruntime can use all cores internally; keep it from going wild
+# (optional: remove if you want unrestricted CPU)
+CPUQuota=800%
+
+[Install]
+WantedBy=multi-user.target
