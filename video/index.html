@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer-when-downgrade"/>
+<meta name="description" content="Fast, easy and free online video converter. Convert MKV, AVI, .. into MP4 or WEBM. Extract or burn-in subtitles, set video quality, resolution, and rotate. No signup required."/>
+<meta property="og:description" content="Fast, easy and free online video converter. Convert MKV, AVI, .. into MP4 or WEBM. Extract or burn-in subtitles, set video quality, resolution, and rotate. No signup required."/>
+<meta property="og:url" content="https://vid.jonhosting.com"/>
+<link rel="canonical" href="https://vid.jonhosting.com">
+<title>Video Converter - Free online MP4 converter</title>
+<style>
+  :root { --bg:#0f1117; --surface:#1a1d27; --accent:#7c6af7; --text:#e2e4ed;
+          --sub:#8b8fa8; --ok:#4caf7d; --err:#e05c5c; --warn:#e0a04a; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--text); font-family:system-ui,sans-serif;
+         display:flex; justify-content:center; min-height:100vh; padding:2rem 1rem; }
+  .card { background:var(--surface); border-radius:16px; padding:2rem;
+          width:100%; max-width:720px; align-self:flex-start;
+          box-shadow:0 8px 32px #0008; }
+  h1 { font-size:1.4rem; color:var(--accent); margin-bottom:1.5rem; }
+  label { display:block; margin-bottom:.35rem; font-size:.85rem; color:var(--sub); }
+  select, input[type=range], input[type=number] {
+    width:100%; background:var(--bg); color:var(--text); border:1px solid #333;
+    border-radius:8px; padding:.55rem; font-size:.95rem; margin-bottom:1rem; }
+  .row { display:flex; gap:1rem; }
+  .row > * { flex:1; }
+  .drop-zone { border:2px dashed #333; border-radius:12px; padding:3rem 1rem;
+               text-align:center; cursor:pointer; transition:border-color .2s;
+               margin-bottom:1.2rem; }
+  .drop-zone.over { border-color:var(--accent); }
+  .drop-zone p { color:var(--sub); font-size:.9rem; margin-top:.4rem; }
+  button { background:var(--accent); color:#fff; border:none; border-radius:8px;
+           padding:.75rem 2rem; font-size:1rem; cursor:pointer; width:100%;
+           transition:opacity .15s; }
+  button:disabled { opacity:.4; cursor:default; }
+  .status-box { margin-top:1.2rem; background:var(--bg); border-radius:8px;
+                padding:1rem; font-size:.85rem; border:1px solid #282c3e; min-height:3rem; }
+  .ok   { color:var(--ok); }
+  .err  { color:var(--err); }
+  .warn { color:var(--warn); }
+  .sub-info { margin-bottom:1rem; background:var(--bg); border-radius:8px;
+              padding:.75rem; font-size:.82rem; color:var(--sub);
+              border:1px solid #282c3e; }
+  .sub-badge { display:inline-block; background:#2a2d3e; border-radius:4px;
+               padding:.15rem .45rem; margin:.15rem; font-size:.78rem; }
+  .sub-badge.image { color:var(--warn); }
+  progress { width:100%; height:6px; margin-top:.5rem; accent-color:var(--accent); }
+  .dl-links { margin-top:1rem; display:flex; gap:.75rem; }
+  .dl-links a { flex:1; background:#23273a; color:var(--text); text-decoration:none;
+                border-radius:8px; padding:.65rem 1rem; text-align:center;
+                font-size:.9rem; transition:background .15s; }
+  .dl-links a:hover { background:var(--accent); }
+  .crf-row { display:flex; align-items:center; gap:.75rem; margin-bottom:1rem; }
+  .crf-row input[type=range] { flex:1; margin-bottom:0; accent-color:var(--accent); }
+  .crf-val { min-width:2.5ch; font-size:.9rem; color:var(--sub); }
+  .warning-note { background:#2a2010; border:1px solid var(--warn); border-radius:8px;
+                  padding:.65rem .9rem; font-size:.82rem; color:var(--warn); margin-bottom:1rem; }
+iframe,video{max-width:95%;}
+  .api-box { margin-top: 1.5rem; background: var(--bg); border-radius: 8px; padding: 1rem;
+             font-size: .8rem; color: var(--sub); border: 1px solid #282c3e; }
+  .api-box pre { white-space: pre-wrap; word-break: break-all; margin-top: .5rem; color: #9da3c0; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>🎬 Video Converter</h1>
+
+  <!-- Drop zone -->
+  <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+    <div style="font-size:2rem">📁</div>
+    <strong>Click or drag a video file here</strong>
+    <p>MKV, AVI, MOV, MP4, TS, WMV, FLV, WEBM, MPG…  ·  Max 8 GB</p>
+    <p id="fileName" style="margin-top:.5rem;color:var(--text)"></p>
+  </div>
+  <input type="file" id="fileInput" accept="video/*,.mkv,.avi,.mov,.ts,.m2ts,.wmv,.flv,.mpg,.mpeg"
+         style="display:none" onchange="onFileChosen(this.files[0])">
+
+  <!-- Subtitle stream info (populated after upload) -->
+  <div class="sub-info" id="subInfo" style="display:none">
+    <strong>Subtitle streams found:</strong><br>
+    <div id="subBadges"></div>
+  </div>
+
+  <!-- Options -->
+  <div class="row">
+    <div>
+      <label for="format">Output format</label>
+      <select id="format" onchange="onFormatChange()">
+        <option value="mp4">MP4 (browser-streamable)</option>
+        <option value="webm">WebM (AV1, slower encode)</option>
+      </select>
+    </div>
+    <div>
+      <label for="codec">Video codec</label>
+      <select id="codec" onchange="onCodecChange()">
+        <option value="h264">H.264 (fast, wide compat)</option>
+        <option value="hevc">H.265 / HEVC (smaller, slower)</option>
+        <option value="av1">AV1 (best ratio, slowest)</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="webmNote" class="warning-note" style="display:none">
+    ⚠️ WebM forces AV1 encoding — expect significantly longer encode times.
+  </div>
+
+  <div class="row">
+  <div>
+    <label for="preset">Preset</label>
+    <select id="preset">
+      <option value="ultrafast">Ultrafast — largest file, fastest</option>
+      <option value="veryfast">Very fast</option>
+      <option value="fast">Fast</option>
+      <option value="medium" selected>Medium (recommended)</option>
+      <option value="slow">Slow — better compression</option>
+      <option value="slower">Slower</option>
+      <option value="veryslow">Very slow — best compression</option>
+    </select>
+  </div>
+    <div>
+      <label for="resolution">Resolution</label>
+<select id="resolution">
+  <option value="source">Source (no resize)</option>
+  <option value="2160">4K — 2160p</option>
+  <option value="1440">1440p</option>
+  <option value="1080">1080p</option>
+  <option value="720">720p</option>
+  <option value="480">480p</option>
+  <option value="360">360p</option>
+  <option value="240">240p</option>
+  <option value="144">144p</option>
+</select>
+    </div>
+</div>
+<div class="row">
+  <div>
+    <label for="rotation">Rotation</label>
+    <select id="rotation">
+      <option value="none">None</option>
+      <option value="cw90">90° clockwise  ↻</option>
+      <option value="ccw90">90° counter-clockwise  ↺</option>
+      <option value="180">180° — upside down</option>
+      <option value="vflip">mirrored upside down</option>
+      <option value="hflip">mirrored</option>
+    </select>
+  </div>
+  <div>
+    <label for="audioBitrate">Audio bitrate</label>
+    <select id="audioBitrate">
+      <option value="96k">96k — voice/podcast</option>
+      <option value="128k">128k — standard</option>
+      <option value="192k" selected>192k — high quality (default)</option>
+      <option value="224k">224k — audibly lossless</option>
+      <option value="256k">256k — transparent</option>
+      <option value="320k">320k — maximum</option>
+    </select>
+  </div>
+</div>
+<div class="row">
+  <div>
+    <label for="subtitleIndex">Subtitle track</label>
+    <select id="subtitleIndex" onchange="onSubtitleChange()">
+      <option value="-1">None</option>
+    </select>
+  </div>
+  <div style="display:flex;flex-direction:column;justify-content:flex-end;padding-bottom:1rem">
+    <label for="burnInSubs" style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+      <input type="checkbox" id="burnInSubs" disabled
+             style="width:1.1rem;height:1.1rem;accent-color:var(--accent)">
+      <span>Burn subtitles into video</span>
+    </label>
+    <div id="burnInNote" style="font-size:.75rem;color:var(--sub);margin-top:.3rem;display:none">
+      Subtitles will be permanently embedded. A .vtt sidecar is also exported.
+    </div>
+  </div>
+  </div>
+
+<label for="crf">
+  Quality (CRF) —
+  <span id="crfLabel">23</span>
+  <span id="crfHint" style="color:var(--sub);font-size:.8rem"></span>
+</label>
+<div class="crf-row">
+  <span style="font-size:.75rem;color:var(--sub);white-space:nowrap">0 = lossless</span>
+  <input type="range" id="crf" min="0" max="51" value="23" oninput="updateCrfLabel()">
+  <span style="font-size:.75rem;color:var(--sub);white-space:nowrap">51 = lossy</span>
+  <span class="crf-val" id="crfVal">23</span>
+</div>
+<div id="crfDesc" style="font-size:.78rem;color:var(--sub);margin-bottom:1rem;margin-top:-.5rem"></div>
+
+<details style="margin-bottom:1rem">
+  <summary style="cursor:pointer;color:var(--sub);font-size:.88rem;user-select:none">
+    ✂️ Trim (optional)
+  </summary>
+  <div class="row" style="margin-top:.75rem">
+    <div>
+      <label for="trimStart">Start time (seconds)</label>
+      <input type="number" id="trimStart" min="0" step="0.1" value="0" placeholder="0">
+    </div>
+    <div>
+      <label for="trimEnd">End time (seconds, 0 = full)</label>
+      <input type="number" id="trimEnd" min="0" step="0.1" value="0" placeholder="0 = no trim">
+    </div>
+  </div>
+</details>
+
+<div class="row" style="margin-bottom:0">
+  <button id="btn"    onclick="startConvert(false)" disabled>Upload a file first</button>
+  <button id="btnSubtitle" onclick="startConvert(true)"  disabled style="background:var(--surface);border:1px solid var(--accent);color:var(--accent)">
+    Extract Subtitles Only
+  </button>
+</div>
+
+  <div class="status-box" id="status"><span style="color:var(--sub)">Waiting for file…</span></div>
+  <progress id="prog" value="0" max="100" style="display:none"></progress>
+  <div class="dl-links" id="dlLinks" style="display:none">
+    <a id="dlVideo" href="#" download>⬇ Download Video</a>
+    <a id="dlVtt"   href="#" download style="display:none">⬇ Download Subtitles (.vtt)</a>
+  </div>
+<div class="row"><div><label><sup>Ads use cookies.</sup></label><iframe loading="lazy" data-aa="2273872" src="//ad.a-ads.com/2273872?size=120x60&background_color=000000" style="border:0;padding:0;overflow:hidden;background-color:transparent;width:120px;height:60px"></iframe></div><div><video id="rsv" controls/></div></div>
+<div class="api-box"><strong>FFmpeg Command-Line Terminal</strong><pre id="fcmd">ffmpeg -i input.mkv output.mp4</pre></div>
+<div class="api-box"><strong>FFmpeg Command - Use only one audiostream</strong><pre>ffmpeg -i input.mp4 -c:v copy -c:a copy -map 0:v:0 -map 0:a:0 output.mp4</pre></div>
+<div class="api-box"><strong>FFmpeg Command - Recommended for animation (HEVC)</strong><pre>ffmpeg -i input.mkv ... -x265-params "aq-mode=3:aq-strength=1.2:psy-rd=2.0:deblock=1,1" output.mp4</pre></div>
+<div class="api-box"><strong>FFmpeg Command - Mix multiple audiotracks</strong><pre>ffmpeg -i "./input.mkv" -map_metadata 0 -movflags faststart -s 1280:720 -filter_complex "[0:2]atrim=start=0:end=867,asetpts=PTS-STARTPTS[a1]; [0:1]atrim=start=867:end=870,asetpts=PTS-STARTPTS,volume=-10dB[jpclip]; [0:2]atrim=start=870,asetpts=PTS-STARTPTS[a2]; [a1][jpclip][a2]concat=n=3:v=0:a=1[outa]" -filter:v "subtitles='.\\input.mkv':si=0" -map 0:v -c:v h264_nvenc -preset slow -crf 20 -rc vbr -cq 22 -pix_fmt yuv420p10le -x265-params "pools=16:aq-mode=3:aq-strength=1.2:psy-rd=2.0:deblock=1,1" -map "[outa]" -c:a aac -b:a 224k -metadata:s:a:0 title="English (Enhanced)" -metadata:s:a:0 language=eng -c:s mov_text "./output.mp4"</pre></div>
+</div>
+<div class="card" id="w" style="display:none;position:fixed;top:0;left:2%;right:0;bottom:0;max-width:96%;">
+<noscript>
+<button onclick="this.parentElement.style.display='none'">X</button>
+<h2>Video processing is expensive</h2>
+<p>Please support us by watching this video while you wait for your video to finish processing.</p>
+<iframe loading="lazy" src="https://www.youtube-nocookie.com/embed/3O1uFG9Hyr4" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen autoplay></iframe>
+<iframe loading="lazy" src="https://www.youtube-nocookie.com/embed/Km-WiPdmq10" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen autoplay></iframe>
+</noscript>
+</div>
+<script>
+let currentJobId = null;
+let pollTimer    = null;
+let uploadedFile = null;
+
+// ── Drag & drop ─────────────────────────────────────────────────────────────
+const dz = document.getElementById('dropZone');
+dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('over');
+  const f = e.dataTransfer.files[0];
+  if (f) onFileChosen(f);
+});
+
+function populateSubtitles(streams) {
+  const sel    = document.getElementById('subtitleIndex');
+  const info   = document.getElementById('subInfo');
+  const badges = document.getElementById('subBadges');
+  sel.innerHTML = '<option value="-1">None</option>';
+  badges.innerHTML = '';
+
+  if (!streams || streams.length === 0) { info.style.display = 'none'; return; }
+  info.style.display = 'block';
+
+  streams.forEach(s => {
+    const label = `[${s.index}] ${s.language || 'und'}  (${s.codec})${s.imageBased ? ' ⚠ image — burn-in only' : ''}`;
+    const opt = document.createElement('option');
+    opt.value = s.index;
+    opt.textContent = label;
+    opt.dataset.imageBased = s.imageBased ? 'true' : 'false';
+//    if (s.imageBased) opt.disabled = true;
+    sel.appendChild(opt);
+
+    const b = document.createElement('span');
+    b.className = 'sub-badge' + (s.imageBased ? ' image' : '');
+    b.textContent = label;
+    badges.appendChild(b);
+  });
+
+  onSubtitleChange();
+}
+
+const checkbox = document.getElementById('burnInSubs');
+function onSubtitleChange() {
+  const idx      = +document.getElementById('subtitleIndex').value;
+  const note     = document.getElementById('burnInNote');
+  // Find if selected track is image-based
+  const sel      = document.getElementById('subtitleIndex');
+  const opt      = sel.options[sel.selectedIndex];
+  const isImage  = opt?.dataset.imageBased === 'true';
+
+  const hasSub = idx >= 0;
+  checkbox.disabled = !hasSub;
+  if (!hasSub) checkbox.checked=false; else if(isImage) checkbox.checked=true;
+  note.style.display = (hasSub && !isImage && checkbox.checked) ? 'block' : 'none';
+}
+
+checkbox.addEventListener('change', () => {
+  document.getElementById('burnInNote').style.display =
+    document.getElementById('burnInSubs').checked ? 'block' : 'none';
+});
+
+// ── Codec / format UI helpers ─────────────────────────────────────────────────
+function onFormatChange() {
+  const fmt   = document.getElementById('format').value;
+  const codec = document.getElementById('codec');
+  const note  = document.getElementById('webmNote');
+  note.style.display = fmt === 'webm' ? 'block' : 'none';
+  if (fmt === 'webm') {
+    // webm → force AV1
+    codec.value = 'av1';
+    codec.disabled = true;
+  } else {
+    codec.disabled = false;
+  }
+  onCodecChange();
+}
+
+function onCodecChange() {
+  const codec = document.getElementById('codec').value;
+  const crf   = document.getElementById('crf');
+  const hint  = document.getElementById('crfHint');
+  if (codec === 'av1') {
+    crf.max   = 63;
+    hint.textContent = '(AV1: 0 = lossless → 63 = worst, default 35)';
+  } else {
+    crf.max   = 51;
+    if (+crf.value > 51) crf.value = 51;
+    hint.textContent = '(H.264/HEVC: 0 = lossless → 51 = worst, default 23)';
+  }
+  updateCrfLabel();
+}
+
+function updateCrfLabel() {
+  const v   = +document.getElementById('crf').value;
+  const codec = document.getElementById('codec').value;
+  document.getElementById('crfLabel').textContent = v;
+  document.getElementById('crfVal').textContent   = v;
+
+  const max = codec === 'av1' ? 63 : 51;
+  const pct = v / max;
+
+  let desc;
+  if      (v === 0)       desc = '🔵 Mathematically lossless — very large file';
+  else if (pct < 0.3)    desc = '🟢 Visually lossless — excellent quality, large file';
+  else if (pct < 0.5)    desc = '🟡 Great quality — good balance (recommended for most content)';
+  else if (pct < 0.75)    desc = '🟠 Noticeable quality loss — smaller file';
+  else                    desc = '🔴 Heavy compression — low quality, smallest file';
+
+  document.getElementById('crfDesc').textContent = desc;
+updateTerm();
+}
+
+function showDownloads(job) {
+  const dl = document.getElementById('dlLinks');
+  dl.style.display = 'flex';
+  var dlv=document.getElementById('dlVideo');
+  dlv.href = `/video/download/${currentJobId}/video`;
+document.getElementById('rsv').src=dlv.href;
+  const vttLink = document.getElementById('dlVtt');
+  if (job.hasVtt) {
+    vttLink.href = `/video/download/${currentJobId}/vtt`;
+    vttLink.style.display = 'block';
+  } else {
+    vttLink.style.display = 'none';
+  }
+}
+
+//
+// ── State ────────────────────────────────────────────────────────────────────
+let fileDurationSec = 0;   // populated after upload probe
+
+// ── File chosen ──────────────────────────────────────────────────────────────
+function onFileChosen(file) {
+  if (!file) return;
+  document.getElementById('fileName').textContent =
+    `${file.name}  (${(file.size / 1073741824).toFixed(2)} GB)`;
+  document.getElementById('btn').disabled = true;
+  document.getElementById('dlLinks').style.display = 'none';
+  resetProgress();
+vadp({});
+  uploadFile(file);
+}
+
+// ── Upload via XHR so we get upload progress ─────────────────────────────────
+function uploadFile(file) {
+  const fd = new FormData();
+  fd.append('file', file);
+
+  const xhr = new XMLHttpRequest();
+
+  xhr.upload.onprogress = e => {
+    if (!e.lengthComputable) return;
+    const pct = (e.loaded / e.total) * 100;
+    setProgress(pct);
+    setStatus(`Uploading… ${pct.toFixed(1)}%`, '');
+  };
+
+xhr.onload = () => {
+  if (xhr.status !== 200) { setStatus('Upload failed: ' + xhr.responseText, 'err'); return; }
+  onUploadDone(JSON.parse(xhr.responseText));
+};
+
+  xhr.onerror = () => setStatus('Upload error (network)', 'err');
+
+  xhr.open('POST', '/video/upload');
+  xhr.send(fd);
+}
+
+// ── Convert ──────────────────────────────────────────────────────────────────
+function onUploadDone(j) {
+  currentJobId    = j.jobId;
+  fileDurationSec = j.durationSeconds ?? 0;
+  populateSubtitles(j.subtitleStreams);
+  setProgress(100);
+  setStatus(`✅ Upload complete — Job #${j.jobId}`, 'ok');
+saveJobState();
+  document.getElementById('btn').textContent    = 'Start Video Conversion';
+  document.getElementById('btn').disabled       = false;
+  // Only enable subtitle button if there are extractable (text-based) streams
+  const hasTextSubs = (j.subtitleStreams ?? []).some(s => !s.imageBased);
+  const btnSub = document.getElementById('btnSubtitle');
+  btnSub.disabled = !hasTextSubs;
+  btnSub.title    = hasTextSubs ? '' : 'No extractable subtitle tracks in this file';
+}
+
+async function startConvert(subtitleOnly) {
+  if (!currentJobId) return;
+  clearInterval(pollTimer);
+  document.getElementById('dlLinks').style.display  = 'none';
+  document.getElementById('btn').disabled      = true;
+  document.getElementById('btnSubtitle').disabled   = true;
+  resetProgress();
+  setStatus('Starting…', '');
+
+  const subtitleIndex = +document.getElementById('subtitleIndex').value;
+
+  if (subtitleOnly) {
+    if (subtitleIndex < 0) {
+      setStatus('Select a subtitle track first', 'err');
+      document.getElementById('btn').disabled    = false;
+      document.getElementById('btnSubtitle').disabled = false;
+      return;
+    }
+    try {
+      const r = await fetch('/video/subtitles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId: currentJobId, subtitleIndex }),
+      });
+      if (!r.ok) { setStatus('Failed: ' + await r.text(), 'err'); return; }
+      pollTimer = setInterval(pollStatus, 2000);
+    } catch(e) { setStatus('Error: ' + e.message, 'err'); }
+    return;
+  }
+
+  const body = {
+    jobId:         currentJobId,
+    codec:         document.getElementById('codec').value,
+    crf:           +document.getElementById('crf').value,
+    resolution:    document.getElementById('resolution').value,
+    format:        document.getElementById('format').value,
+    subtitleIndex,
+    preset:        document.getElementById('preset').value,
+    trimStart:     +document.getElementById('trimStart').value,
+    trimEnd:       +document.getElementById('trimEnd').value,
+    rotation: document.getElementById('rotation').value,
+    burnInSubs: document.getElementById('burnInSubs').checked,
+    audioBitrate: document.getElementById('audioBitrate').value,
+  };
+
+  try {
+    const r = await fetch('/video/convert', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) { setStatus('Convert request failed: ' + await r.text(), 'err'); return; }
+    pollTimer = setInterval(pollStatus, 2000);
+  } catch(e) { setStatus('Error: ' + e.message, 'err'); }
+var w=document.getElementById('w');if(w.children.length==1){w.innerHTML=w.children[0].innerHTML;}w.style.display='';vadp({});
+}
+
+function updateTerm(){
+  const b = {
+    codec:         document.getElementById('codec').value,
+    crf:           +document.getElementById('crf').value,
+    resolution:    document.getElementById('resolution').value,
+    format:        document.getElementById('format').value,
+    subtitleIndex,
+    preset:        document.getElementById('preset').value,
+    trimStart:     +document.getElementById('trimStart').value,
+    trimEnd:       +document.getElementById('trimEnd').value,
+    rotation: document.getElementById('rotation').value,
+    burnInSubs: document.getElementById('burnInSubs').checked,
+    audioBitrate: document.getElementById('audioBitrate').value,
+  };
+var cmd = "ffmpeg -i input.mkv " + (b.trimStart ? "-ss "+b.trimStart+" " : "") + (b.trimEnd ? "-to "+b.trimEnd+" ":"") + (b.format == "mp4" ? "-movflags +faststart " : "");
+switch(b.codec){case "hevc":cmd+="-c:v libx265 -crf "+b.crf+" -preset "+b.preset+" -tag:v hvc1";break;case "avc":cmd+=(b.format == "webm" ? "-c:v libaom-av1 -crf "+b.crf+" -b:v 0 -cpu-used "+MapAv1Preset(b.preset)+" -row-mt 1" : "-c:v libsvtav1 -crf {crf} -preset "+b.preset+" -svtav1-params tune=0");break;default:cmd+="-c:v libx264 -crf "+b.crf+" -preset "+b.preset+" -pix_fmt yuv420p";break;}
+switch(b.format){case "webm":cmd+=" -c:a libopus -b:a "+b.audioBitrate;break;default:cmd+=" -c:a aac -b:a "+b.audioBitrate;break;}
+var vf=[];
+if(b.resolution!="source")vf[vf.length]="scale=-2:"+b.resolution+":flags=lanczos";
+if(b.burnInSubs){vf[vf.length]="subtitles='input.mkv':si="+(b.subtitleIndex.selectedIndex-1);}
+switch(b.rotation){case "cw90":vf[vf.length]="transpose=1";break;case "ccw90":vf[vf.length]="transpose=2";break;case "180":vf[vf.length]="hflip,vflip";break;}
+// if Image: not added on clientside
+if(vf.length){cmd+=" -vf \""+vf.join(",")+"\" -map 0:v:0 -map 0:a?";}else{cmd+=" -map 0:v:0 -map 0:a?";}
+document.getElementById('fcmd').innerText= cmd + " output."+b.format;
+}
+function MapAv1Preset(p){
+return {"veryslow":2,"slower":3,"slow":4,"medium":6,"fast":8,"faster":9,"veryfast":10,"superfast":11,"ultrafast":12}[p];
+}
+
+// ── Status polling ────────────────────────────────────────────────────────────
+async function pollStatus() {
+  if (!currentJobId) return;
+  try {
+    const r = await fetch(`/video/status/${currentJobId}`);
+    const j = await r.json();
+
+    if (j.state === 'done') {
+      clearInterval(pollTimer);
+      setProgress(100);
+      setStatus('✅ Conversion complete!', 'ok');
+      showDownloads(j);
+      document.getElementById('btn').disabled    = false;
+      document.getElementById('btn').textContent = 'Convert Again';
+clearJobState();
+    } else if (j.state === 'failed') {
+      clearInterval(pollTimer);
+      setStatus('❌ ' + j.error, 'err');
+      document.getElementById('btn').disabled = false;
+clearJobState();
+    } else {
+      // Parse "frame=x  fps=x  time=HH:MM:SS  speed=x" from C# progress string
+      const timeMatch = j.progress.match(/time=([\d:]+)/);
+      if (timeMatch && fileDurationSec > 0) {
+        const parts  = timeMatch[1].split(':').map(Number);
+        const elapsedSec = parts[0] * 3600 + parts[1] * 60 + parts[2];
+        const pct    = Math.min((elapsedSec / fileDurationSec) * 100, 99); // never show 100 until done
+        setProgress(pct);
+      }
+      setStatus('⏳ ' + j.progress, '');
+var rm=document.getElementsByClassName('rmp-container');
+if(!rm.length)vadp({});
+    }
+  } catch(e) { /* ignore transient poll errors */ }
+}
+
+// ── Persistence ───────────────────────────────────────────────────────────
+const LS_KEY = 'videoconv_job';
+
+function saveJobState() {
+  if (!currentJobId) return;
+  localStorage.setItem(LS_KEY, JSON.stringify({
+    jobId:           currentJobId,
+    durationSeconds: fileDurationSec,
+  }));
+}
+
+function clearJobState() {
+  localStorage.removeItem(LS_KEY);
+}
+
+// Call on page load — resume polling if a job was in progress
+(function resumeIfNeeded() {
+  const raw = localStorage.getItem(LS_KEY);
+  if (!raw) return;
+  try {
+    const saved = JSON.parse(raw);
+    if (!saved.jobId) return;
+    currentJobId    = saved.jobId;
+    fileDurationSec = saved.durationSeconds ?? 0;
+    setStatus(`⏳ Resuming job #${currentJobId}…`, '');
+    resetProgress();
+    document.getElementById('btnVideo').textContent    = 'Start Video Conversion';
+    document.getElementById('btnVideo').disabled       = true;
+    document.getElementById('btnSubtitle').disabled    = true;
+    pollTimer = setInterval(pollStatus, 2000);
+  } catch { clearJobState(); }
+})();
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function setProgress(pct) {
+  const el = document.getElementById('prog');
+  el.style.display = 'block';
+  el.value = pct;
+}
+
+function resetProgress() {
+  const el = document.getElementById('prog');
+  el.style.display = 'block';
+  el.value = 0;
+}
+
+function setStatus(msg, cls) {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className   = 'status-box ' + (cls || '');
+}
+
+// init
+onCodecChange();
+
+function vadp(cje){
+var d = document,
+    s = d.createElement('script'),
+    l = d.scripts[d.scripts.length - 1];
+s.settings = cje || {};
+s.src = "\/\/shameful-farm.com\/b\/X\/VasKd.Gdli0zYnWqcj\/peHmw9PuTZtU\/lWkmP\/TTcSw\/M-z\/AdzdOBDrUKtJNqzMAZzOM\/DfMe4HOHQr";
+s.async = true;
+s.referrerPolicy = 'no-referrer-when-downgrade';
+l.parentNode.insertBefore(s, l);
+if(vadp.L)return;
+vadp.L=true;
+var g=d.head.appendChild(d.createElement('script'));g.async=true;g.crossorigin="anonymous";
+g.src='https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7904260775348405';
+}
+</script>
+</body>
+</html>
