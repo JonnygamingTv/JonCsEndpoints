@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Artist Dashboard — MusicStore</title>
+<style>
+  :root{--bg:#0d0f14;--s:#161a24;--a:#a78bfa;--t:#e2e4ed;--sub:#8b8fa8;--err:#e05c5c;--ok:#4caf7d}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--t);font-family:system-ui,sans-serif;min-height:100vh}
+  nav{display:flex;align-items:center;gap:1rem;padding:.8rem 2rem;background:var(--s);
+      border-bottom:1px solid #222;margin-bottom:2rem}
+  nav strong{color:var(--a);margin-right:auto}
+  nav a{color:var(--sub);text-decoration:none;font-size:.9rem}
+  .wrap{max-width:900px;margin:0 auto;padding:0 1.5rem 4rem}
+  h2{font-size:1.2rem;margin-bottom:1rem;margin-top:2rem}
+  .track-row{background:var(--s);border-radius:10px;padding:1rem 1.2rem;
+             display:flex;align-items:center;gap:1rem;margin-bottom:.6rem}
+  .track-row img{width:48px;height:48px;border-radius:6px;object-fit:cover;background:#111}
+  .track-info{flex:1;min-width:0}
+  .track-title{font-size:.9rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .track-meta{font-size:.78rem;color:var(--sub);margin-top:.2rem}
+  .btn{background:var(--a);color:#fff;border:none;border-radius:7px;padding:.4rem .9rem;
+       font-size:.82rem;cursor:pointer}
+  .btn.ghost{background:transparent;border:1px solid var(--a);color:var(--a)}
+  .btn.danger{background:transparent;border:1px solid var(--err);color:var(--err)}
+  input,textarea{width:100%;background:var(--bg);color:var(--t);border:1px solid #333;
+                 border-radius:8px;padding:.55rem;font-size:.88rem;margin-bottom:.6rem}
+  label{font-size:.8rem;color:var(--sub);display:block;margin-bottom:.2rem}
+  .edit-panel{background:var(--bg);border-radius:8px;padding:1rem;margin-top:.6rem;display:none}
+  .credits-box{background:var(--s);border-radius:10px;padding:1.2rem;margin-bottom:1rem}
+  .credits-val{font-size:1.6rem;font-weight:700;color:var(--a)}
+  .pay-row{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.8rem}
+  .name-req{background:var(--s);border-radius:10px;padding:1rem;margin-top:1rem}
+  .msg{font-size:.82rem;margin-top:.4rem;min-height:1em}
+  .ok{color:var(--ok)} .err{color:var(--err)}
+</style>
+</head>
+<body>
+<nav>
+  <strong>🎵 Artist Dashboard</strong>
+  <a href="/">Browse</a>
+  <span id="nav-name" style="color:var(--sub);font-size:.85rem"></span>
+  <a href="#" onclick="logout()">Logout</a>
+</nav>
+
+<div class="wrap">
+  <!-- Credits & top-up -->
+  <h2>Credits</h2>
+  <div class="credits-box">
+    <div class="credits-val" id="credits-val">—</div>
+    <div style="color:var(--sub);font-size:.82rem;margin-top:.3rem">
+      Your balance (earnings + purchases)
+    </div>
+    <div class="pay-row">
+      <select id="topup-amount" style="width:auto;margin:0">
+        <option value="500">$5</option>
+        <option value="1000">$10</option>
+        <option value="2500">$25</option>
+        <option value="5000">$50</option>
+        <option value="10000">$100</option>
+      </select>
+      <button class="btn" onclick="topup('paypal')">PayPal</button>
+      <button class="btn" onclick="topup('stripe')">Card (Stripe)</button>
+      <button class="btn" onclick="topup('coinbase')" style="background:#1652f0">Crypto</button>
+    </div>
+    <div class="msg" id="pay-msg"></div>
+  </div>
+
+  <!-- Artist name change -->
+  <h2>Artist Name</h2>
+  <div class="name-req">
+    <div style="font-size:.9rem">Current: <strong id="current-name">—</strong></div>
+    <div style="font-size:.8rem;color:var(--sub);margin:.4rem 0 .8rem">
+      Name changes require mod approval (usually within 24h).
+    </div>
+    <input type="text" id="new-name-input" placeholder="Requested new name" maxlength="40">
+    <button class="btn" onclick="requestNameChange()">Request Change</button>
+    <div class="msg" id="name-msg"></div>
+  </div>
+
+  <!-- Uploads -->
+  <h2>My Tracks</h2>
+  <div id="tracks-list"><div style="color:var(--sub)">Loading…</div></div>
+</div>
+
+<script>
+const ME = { id:0,email:1,artist:2,credits:3,is_mod:4,owned:5 };
+let me = null;
+
+(async () => {
+  const r = await fetch('/m/me');
+  if (!r.ok) { location.href = '/'; return; }
+  me = await r.json();
+  document.getElementById('nav-name').textContent     = me[ME.artist] || me[ME.email];
+  document.getElementById('current-name').textContent = me[ME.artist] || '(none)';
+  document.getElementById('credits-val').textContent  = `$${(me[ME.credits]/100).toFixed(2)}`;
+  await loadTracks();
+})();
+
+async function loadTracks() {
+  // Fetch all audio owned by this user via browse with owner filter
+  // (You may want to add a /m/my-tracks endpoint for this — see note below)
+  const r = await fetch(`/m/my-tracks`);
+  const list = document.getElementById('tracks-list');
+  if (!r.ok) { list.innerHTML = '<div style="color:var(--sub)">Could not load tracks.</div>'; return; }
+  const tracks = await r.json(); // array of [id, title, price, plays, hasWav, active]
+  list.innerHTML = '';
+  if (!tracks.length) { list.innerHTML = '<div style="color:var(--sub)">No tracks yet. <a href="/">Upload one!</a></div>'; return; }
+  for (const t of tracks) {
+    const row = document.createElement('div');
+    row.className = 'track-row';
+    row.id = `row-${t[0]}`;
+    row.innerHTML = `
+      <img src="/m/icon?id=${t[0]}" alt="">
+      <div class="track-info">
+        <div class="track-title">${esc(t[1])}</div>
+        <div class="track-meta">${t[3].toLocaleString()} plays · $${(t[2]/100).toFixed(2)} · ${t[4]?'WAV+MP3':'MP3'}</div>
+      </div><a href="/track?id=${t[0]}"><button class="btn">View</button></a>
+      <button class="btn ghost" onclick="toggleEdit(${t[0]},this)">Edit</button>
+      <button class="btn danger" onclick="deleteTrack(${t[0]})">Delete</button>`;
+    // Inline edit panel
+    const panel = document.createElement('div');
+    panel.className = 'edit-panel';
+    panel.id = `edit-${t[0]}`;
+    panel.innerHTML = `
+      <label>Title</label><input id="et-${t[0]}" value="${esc(t[1])}" maxlength="100">
+      <label>Price (cents)</label><input type="number" id="ep-${t[0]}" value="${t[2]}" min="0">
+      <label>Description</label><textarea id="ed-${t[0]}" rows="3">${esc(t[7])}</textarea>
+      <button class="btn" onclick="saveEdit(${t[0]})">Save</button>
+      <span class="msg" id="em-${t[0]}"></span>`;
+    row.after(panel);
+    list.appendChild(row);
+    list.appendChild(panel);
+  }
+}
+
+function toggleEdit(id, btn) {
+  const p = document.getElementById(`edit-${id}`);
+  const open = p.style.display === 'block';
+  p.style.display = open ? 'none' : 'block';
+  btn.textContent = open ? 'Edit' : 'Close';
+}
+
+async function saveEdit(id) {
+  const title = document.getElementById(`et-${id}`).value.trim();
+  const price = parseInt(document.getElementById(`ep-${id}`).value) || 0;
+  const desc  = document.getElementById(`ed-${id}`).value.trim();
+  const msg   = document.getElementById(`em-${id}`);
+  const r = await fetch('/m/audio/edit', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ audioId: id, title, price, description: desc })
+  });
+  const j = await r.json();
+  msg.className = r.ok ? 'msg ok' : 'msg err';
+  msg.textContent = r.ok ? 'Saved!' : (j.e || 'Error');
+}
+
+async function deleteTrack(id) {
+  if (!confirm('Delete this track? This cannot be undone.')) return;
+  const r = await fetch('/m/audio/delete', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ audioId: id })
+  });
+  if (r.ok) document.getElementById(`row-${id}`)?.remove();
+}
+
+async function topup(provider) {
+  const credits = parseInt(document.getElementById('topup-amount').value);
+  const msg = document.getElementById('pay-msg');
+  msg.textContent = 'Creating payment…';
+  const r = await fetch(`/m/pay/${provider}/create?credits=${credits}`, { method:'POST' });
+  const j = await r.json();
+  if (!r.ok) { msg.className='msg err'; msg.textContent = j.e || 'Error'; return; }
+  // Redirect to provider checkout
+  const url = j.approveUrl || j.checkoutUrl || j.hostedUrl;
+  if (url) location.href = url;
+}
+
+async function requestNameChange() {
+  const name = document.getElementById('new-name-input').value.trim();
+  const msg  = document.getElementById('name-msg');
+  const r = await fetch('/m/artist/name-request', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ newName: name })
+  });
+  const j = await r.json();
+  msg.className = r.ok ? 'msg ok' : 'msg err';
+  msg.textContent = r.ok ? j.msg : (j.e || 'Error');
+}
+
+async function logout() {
+  await fetch('/m/logout', { method:'POST' });
+  location.href = '/';
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
