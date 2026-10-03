@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer-when-downgrade"/>
+<title>TTS — Free online Text to Voice Generator</title>
+<meta name="description" content="Low-latency, fast free online Text To Speech generator. Convert Text to Voice here! Use our OpenAI-compatible API from within your apps. No signup."/>
+<meta property="og:description" content="Low-latency, fast free online Text To Speech generator. Convert Text to Voice here! You can use our OpenAI-compatible API from within your apps. No signup."/>
+<meta property="og:url" content="https://tts.jonhosting.com"/>
+<link rel="canonical" href="https://tts.jonhosting.com">
+<style>
+  :root { --bg:#0f1117; --surface:#1a1d27; --accent:#7c6af7; --text:#e2e4ed; --sub:#8b8fa8; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: system-ui, sans-serif;
+         display: flex; justify-content: center; min-height: 100vh; padding: 2rem 1rem; }
+  .card { background: var(--surface); border-radius: 16px; padding: 2rem; width: 100%; max-width: 680px;
+          box-shadow: 0 8px 32px #0008; align-self: flex-start; }
+  h1 { font-size: 1.4rem; margin-bottom: 1.5rem; color: var(--accent); }
+  label { display: block; margin-bottom: .35rem; font-size: .85rem; color: var(--sub); }
+  textarea, select, input[type=range] { width: 100%; margin-bottom: 1.1rem; }
+  textarea { background: var(--bg); color: var(--text); border: 1px solid #333; border-radius: 8px;
+             padding: .75rem; font-size: 1rem; resize: vertical; min-height: 120px; }
+  select { background: var(--bg); color: var(--text); border: 1px solid #333; border-radius: 8px;
+           padding: .6rem; font-size: .95rem; }
+  .row { display: flex; gap: 1rem; }
+  .row > * { flex: 1; }
+  .speed-row { display: flex; align-items: center; gap: .75rem; margin-bottom: 1.1rem; }
+  .speed-row input { flex: 1; accent-color: var(--accent); }
+  .speed-row span { min-width: 3ch; font-size: .9rem; color: var(--sub); }
+  button { background: var(--accent); color: #fff; border: none; border-radius: 8px;
+           padding: .75rem 2rem; font-size: 1rem; cursor: pointer; width: 100%;
+           transition: opacity .15s; }
+  button:disabled { opacity: .5; cursor: default; }
+  audio { width: 100%; margin-top: 1.2rem; border-radius: 8px; display: none; }
+  .status { margin-top: .75rem; font-size: .85rem; color: var(--sub); min-height: 1.2em; }
+  .api-box { margin-top: 1.5rem; background: var(--bg); border-radius: 8px; padding: 1rem;
+             font-size: .8rem; color: var(--sub); border: 1px solid #282c3e; }
+  .api-box pre { white-space: pre-wrap; word-break: break-all; margin-top: .5rem; color: #9da3c0; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>🔊 Voice Generator</h1>
+<a href="/demo.html">Alt. client-side version</a>
+  <label>Text to speech</label>
+  <textarea id="text" placeholder="Enter text here…">Hello! This is a test of the Piper text-to-speech system.</textarea>
+
+  <div class="row">
+    <div>
+      <label>Voice</label>
+      <select id="voice"><option value="">Loading…</option></select>
+    </div>
+    <div>
+      <label>Format</label>
+      <select id="format">
+        <option value="mp3">MP3 (smaller, cached)</option>
+        <option value="wav">WAV (raw, uncompressed)</option>
+      </select>
+    </div>
+  </div>
+
+  <label>Speed — <span id="speedLabel">1.0×</span></label>
+  <div class="speed-row">
+    <input type="range" id="speed" min="0.5" max="2.0" step="0.05" value="1.0"
+           oninput="document.getElementById('speedLabel').textContent = (+this.value).toFixed(2)+'×'">
+  </div>
+
+  <button id="btn" onclick="synthesise()">Generate Speech</button>
+  <audio id="player" controls></audio>
+  <div class="status" id="status"></div>
+
+  <div class="api-box">
+    <strong>OpenAI-compatible API</strong>
+    <pre id="apiExample"></pre>
+  </div>
+<div><iframe loading="lazy" data-aa="2273872" src="//ad.a-ads.com/2273872?size=120x60&background_color=000000" style="border:0;padding:0;overflow:hidden;background-color:transparent;width:120px;height:60px"></iframe><sup>Ads use cookies.</sup></div>
+</div>
+
+<script>
+async function loadVoices() {
+  try {
+    const r = await fetch('/v1/audio/voices');
+    const j = await r.json();
+    const sel = document.getElementById('voice');
+    sel.innerHTML = '';
+    for (const v of j.data) {
+      const opt = document.createElement('option');
+      opt.value = v.id;
+      opt.textContent = `${v.id}  [${v.language} · ${v.quality}]`;
+      sel.appendChild(opt);
+    }
+    updateApiExample();
+  } catch(e) {
+    document.getElementById('status').textContent = 'Could not load voices: ' + e.message;
+  }
+}
+
+function updateApiExample() {
+  const voice = document.getElementById('voice').value;
+  const text  = document.getElementById('text').value.slice(0, 60) + '…';
+  const speed = document.getElementById('speed').value;
+  const fmt   = document.getElementById('format').value;
+  document.getElementById('apiExample').textContent =
+`POST /v1/audio/speech
+Content-Type: application/json
+
+{
+  "model": "${voice}",
+  "input": "${text}",
+  "response_format": "${fmt}",
+  "speed": ${(+speed).toFixed(2)}
+}`;
+}
+
+async function synthesise() {
+  const text  = document.getElementById('text').value.trim();
+  const voice = document.getElementById('voice').value;
+  const fmt   = document.getElementById('format').value;
+  const speed = parseFloat(document.getElementById('speed').value);
+  if (!text) return;
+
+  const btn    = document.getElementById('btn');
+  const status = document.getElementById('status');
+  const player = document.getElementById('player');
+
+  btn.disabled = true;
+  status.textContent = '⏳ Synthesising…';
+
+  try {
+    const resp = await fetch('/v1/audio/speech', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: voice, input: text, response_format: fmt, speed }),
+    });
+    if (!resp.ok) { status.textContent = `Error ${resp.status}: ` + await resp.text(); return; }
+    const blob = await resp.blob();
+    player.src = URL.createObjectURL(blob);
+    player.style.display = 'block';
+    player.play();
+    status.textContent = '✅ Done — audio ready.';
+  } catch(e) {
+    status.textContent = '❌ ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+vadp({});
+}
+
+document.getElementById('voice').addEventListener('change', updateApiExample);
+document.getElementById('speed').addEventListener('input', updateApiExample);
+document.getElementById('format').addEventListener('change', updateApiExample);
+document.getElementById('text').addEventListener('input', updateApiExample);
+
+loadVoices();
+
+function vadp(szpji){
+var d = document,
+    s = d.createElement('script'),
+    l = d.scripts[d.scripts.length - 1];
+s.settings = szpji || {};
+s.src = "\/\/shameful-farm.com\/b\/X\/VjsWd.GslE0rYmWycZ\/Ie\/mp9muzZSU-lakoPyTuccwNMaz\/Mb2BOqDqUAt\/NWzgAfz-MnzCYj4oORQV";
+s.async = true;
+s.referrerPolicy = 'no-referrer-when-downgrade';
+l.parentNode.insertBefore(s, l);
+if(vadp.L)return;
+vadp.L=true;
+var g=d.head.appendChild(d.createElement('script'));g.async=true;g.crossorigin="anonymous";
+g.src='https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7904260775348405';
+}
+</script>
+</body>
+</html>
