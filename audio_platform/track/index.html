@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Track — MusicStore</title>
+<style>
+  :root{--bg:#0d0f14;--s:#161a24;--a:#a78bfa;--t:#e2e4ed;--sub:#8b8fa8}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--t);font-family:system-ui,sans-serif;
+       display:flex;justify-content:center;padding:3rem 1rem;min-height:100vh}
+  .card{background:var(--s);border-radius:16px;padding:2rem;max-width:540px;width:100%;
+        align-self:flex-start}
+  img{width:100%;border-radius:10px;aspect-ratio:1;object-fit:cover;background:#1a1d27;margin-bottom:1.2rem}
+  h1{font-size:1.4rem;margin-bottom:.3rem}
+  .artist{color:var(--a);font-size:.9rem;margin-bottom:.5rem}
+  .meta{color:var(--sub);font-size:.8rem;margin-bottom:1rem}
+  .desc{font-size:.88rem;line-height:1.6;color:var(--sub);margin-bottom:1.5rem;white-space:pre-wrap}
+  .price{font-size:1.1rem;font-weight:600;margin-bottom:1rem}
+  .btn{background:var(--a);color:#fff;border:none;border-radius:8px;padding:.65rem 1.8rem;
+       font-size:.95rem;cursor:pointer;width:100%;margin-bottom:.5rem}
+  .btn.ghost{background:transparent;border:1px solid var(--a);color:var(--a)}
+  audio{width:100%;margin-top:1rem}
+  .back{color:var(--sub);text-decoration:none;font-size:.85rem;display:inline-block;margin-bottom:1.5rem}
+</style>
+</head>
+<body>
+<div class="card">
+  <a class="back" href="/">← Browse</a>
+  <img id="icon" alt="">
+  <h1 id="title">Loading…</h1>
+  <div class="artist" id="artist"></div>
+  <div class="meta" id="meta"></div>
+  <div class="desc" id="desc"></div>
+  <div class="price" id="price"></div>
+  <button class="btn" id="action-btn">Loading…</button>
+  <button class="btn ghost" id="lib-btn" style="display:none">+ Add to Library</button>
+  <audio id="player" controls preload="none" style="display:none"></audio>
+</div>
+<script>
+// Track info array indices
+const T = { id:0,title:1,desc:2,price:3,plays:4,hasWav:5,createdAt:6,artist:7,ownerId:8 };
+const ME = { id:0,email:1,artist:2,credits:3,is_mod:4,owned:5 };
+
+let track = null, me = null;
+const id = new URLSearchParams(location.search).get('id');
+
+(async () => {
+  if (!id) { document.getElementById('title').textContent = 'Track not found'; return; }
+
+  [track, me] = await Promise.all([
+    fetch(`/m/track?id=${id}`).then(r => r.ok ? r.json() : null),
+    fetch('/m/me').then(r => r.ok ? r.json() : null),
+  ]);
+
+  if (!track) { document.getElementById('title').textContent = 'Track not found'; return; }
+
+  document.title = `${track[T.title]} — MusicStore`;
+  document.getElementById('icon').src     = `/m/icon?id=${track[T.id]}`;
+  document.getElementById('title').textContent  = track[T.title];
+  document.getElementById('artist').textContent = track[T.artist] || 'Unknown Artist';
+  document.getElementById('desc').textContent   = track[T.desc] || '';
+
+  const date = new Date(track[T.createdAt] * 1000);
+  document.getElementById('meta').textContent =
+    `${track[T.plays].toLocaleString()} plays · ${date.toLocaleDateString()}`;
+
+  const isFree  = track[T.price] === 0;
+  const isOwned = me && (me[ME.owned].includes(track[T.id]) || isFree);
+
+  document.getElementById('price').textContent =
+    isFree ? 'Free' : `$${(track[T.price]/100).toFixed(2)}`;
+
+  const btn    = document.getElementById('action-btn');
+  const libBtn = document.getElementById('lib-btn');
+  const player = document.getElementById('player');
+
+  if (isOwned || isFree) {
+    btn.textContent = '▶ Play';
+    btn.onclick = () => {
+      player.src = `/m/stream/${track[T.id]}`;
+      player.style.display = 'block';
+      player.play();
+      btn.style.display = 'none';
+    };
+    if (isFree && me && !me[ME.owned].includes(track[T.id])) {
+      libBtn.style.display = 'block';
+      libBtn.onclick = async () => {
+        await fetch('/m/library/add', { method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ audioId: track[T.id] }) });
+        libBtn.textContent = '✓ Added';
+        libBtn.disabled = true;
+      };
+    }
+    if (track[T.hasWav]) {
+      const dlWav = document.createElement('a');
+      dlWav.href = `/m/download/${track[T.id]}/wav`;
+      dlWav.className = 'btn ghost';
+      dlWav.style.display = 'block';
+      dlWav.style.textAlign = 'center';
+      dlWav.style.marginBottom = '.5rem';
+      dlWav.textContent = '⬇ Download WAV';
+      player.after(dlWav);
+    }
+  } else if (!me) {
+    btn.textContent = 'Login to Purchase';
+    btn.onclick = () => location.href = '/';
+  } else {
+    btn.textContent = `Purchase — $${(track[T.price]/100).toFixed(2)}`;
+    btn.onclick = async () => {
+      if (!confirm(`Purchase for $${(track[T.price]/100).toFixed(2)}?`)) return;
+      const r = await fetch('/m/purchase', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ audioId: track[T.id] })
+      });
+      const j = await r.json();
+      if (!r.ok) { alert(j.e); return; }
+      location.reload();
+    };
+  }
+})();
+</script>
+</body>
+</html>
